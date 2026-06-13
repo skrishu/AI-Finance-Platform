@@ -6,25 +6,25 @@ A machine learning-based personal finance application that helps users track exp
 
 ## Features
 
-### 🔐 User Authentication
+###  User Authentication
 - User signup and login
 - Secure session handling
 - User-specific financial data storage
 
-### 💰 Expense & Income Tracking
+###  Expense & Income Tracking
 - Add income transactions
 - Add daily expenses
 - Categorize spending
 - Track transaction history
 
-### 📊 Interactive Dashboard
+###  Interactive Dashboard
 - Total income overview
 - Expense analysis
 - Savings calculation
 - Category-wise spending visualization
 - Monthly expense trends
 
-### 🤖 AI-Powered Features
+###  AI-Powered Features
 
 #### Expense Forecasting
 - Predicts future spending patterns using machine learning
@@ -38,12 +38,12 @@ A machine learning-based personal finance application that helps users track exp
 - Generates personalized spending insights
 - Provides budgeting suggestions
 
-### 🎯 Financial Planning
+###  Financial Planning
 - Savings goal tracking
 - Financial Health Score
 - Budget monitoring
 
-### 📄 Reports & Export
+###  Reports & Export
 - Download transaction data as CSV
 - Generate monthly financial reports as PDF
 
