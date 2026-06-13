@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+
+# Database
+*.db
+
+# Streamlit
+.streamlit/
+
+# Generated reports
+*.pdf
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code settings (optional)
+.vscode/
