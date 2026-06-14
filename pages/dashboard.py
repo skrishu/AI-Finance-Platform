@@ -1,38 +1,43 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+
 from utils.insights import generate_insights
 from database.db import SessionLocal
-from database.models import Expense, Income
+from database.models import Expense, Income, Goal
+
 from models.expense_model import (
     train_expense_model,
     predict_next_month
 )
-from models.anomaly_detection import detect_anomalies
+
 from utils.health_score import calculate_health_score
 from utils.recommendations import generate_recommendations
-from database.models import Goal
+from models.anomaly_detection import detect_anomalies
+
 from utils.export import export_transactions
 from utils.report import create_report
 
+
+# ---------------- LOGIN CHECK ----------------
+
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.switch_page("pages/login.py")
-
-st.title("📊 Finance Dashboard")
-
-
-if "logged_in" not in st.session_state:
-    st.stop()
 
 
 user_id = st.session_state.user_id
 
 
+# ---------------- PAGE ----------------
+
+st.title("💰 AI Finance Dashboard")
+
+
+# ---------------- DATABASE ----------------
+
 db = SessionLocal()
 
 
-# Fetch user transactions
 expenses = db.query(Expense).filter(
     Expense.user_id == user_id
 ).all()
@@ -43,10 +48,14 @@ income = db.query(Income).filter(
 ).all()
 
 
+goals = db.query(Goal).filter(
+    Goal.user_id == user_id
+).all()
+
+
 db.close()
 
 
-# Convert to dataframe
 
 expense_df = pd.DataFrame(
     [
@@ -73,8 +82,6 @@ income_df = pd.DataFrame(
 
 
 
-# Empty state
-
 if expense_df.empty and income_df.empty:
 
     st.info(
@@ -85,7 +92,8 @@ if expense_df.empty and income_df.empty:
 
 
 
-# Metrics
+# ---------------- CALCULATIONS ----------------
+
 
 total_income = (
     income_df["Amount"].sum()
@@ -101,67 +109,52 @@ total_expense = (
 )
 
 
-balance = total_income - total_expense
-savings = balance
+savings = total_income - total_expense
+
 
 savings_rate = (
-    (savings / total_income) * 100
+    savings / total_income * 100
     if total_income > 0
     else 0
 )
 
 
 
-col1, col2, col3, col4 = st.columns(4)
+# ---------------- TOP CARDS ----------------
 
 
-col1.metric(
-    "💰 Total Income",
+st.subheader("📌 Financial Overview")
+
+
+c1,c2,c3,c4 = st.columns(4)
+
+
+c1.metric(
+    "💰 Income",
     f"₹{total_income:,.0f}"
 )
 
 
-col2.metric(
-    "💸 Total Expense",
+c2.metric(
+    "💸 Expenses",
     f"₹{total_expense:,.0f}"
 )
 
 
-col3.metric(
-    "🏦 Remaining Balance",
-    f"₹{balance:,.0f}"
+c3.metric(
+    "🏦 Savings",
+    f"₹{savings:,.0f}"
 )
 
-col4.metric(
+
+c4.metric(
     "📈 Savings Rate",
     f"{savings_rate:.1f}%"
 )
 
 
-st.subheader(
-    "Financial Health Score",
-    help="""
-Financial Health Score is a custom metric calculated using:
 
-• Savings Behaviour
-• Budget Control
-• Emergency Fund Coverage
-• Debt Management
-
-Formula:
-
-Score =
-35% × Savings Score
-+ 25% × Budget Score
-+ 20% × Emergency Fund Score
-+ 20% × Debt Score
-
-Higher score indicates healthier financial habits.
-"""
-)
-st.caption(
-    "This score is an internal financial wellness indicator based on your spending patterns and is not a credit score."
-)
+# ---------------- HEALTH ----------------
 
 
 score, breakdown = calculate_health_score(
@@ -172,65 +165,133 @@ score, breakdown = calculate_health_score(
 )
 
 
-st.metric(
-    "Health Score",
-    f"{score}/100",
-    help="Calculated from savings rate, budget usage, emergency fund, and debt indicators."
-)
-
-
-for key,value in breakdown.items():
-
-    st.write(
-        f"{key}: {value} points"
-    )
 
 st.subheader(
-    "📄 Monthly Report"
+    "🩺 Financial Health"
 )
 
 
-if st.button("Generate PDF Report"):
+h1,h2 = st.columns([2,1])
 
-    create_report(
-        "finance_report.pdf",
-        total_income,
-        total_expense,
-        savings,
-        score
+
+with h1:
+
+    st.metric(
+        "Financial Health Score",
+        f"{score}/100",
+        help="""
+Calculated using:
+
+• Savings behaviour
+• Expense control
+• Emergency fund
+• Debt management
+
+This is a personal wellness indicator,
+not a credit score.
+"""
     )
 
 
-    with open(
-        "finance_report.pdf",
-        "rb"
-    ) as file:
 
-        st.download_button(
-            "Download PDF",
-            file,
-            file_name="finance_report.pdf"
+with h2:
+
+    st.write("Score Breakdown")
+
+    for k,v in breakdown.items():
+
+        st.write(
+            f"{k}: {v}"
         )
 
-    
-# Financial insights    
+
+
+# ---------------- CHARTS ----------------
+
+
+if not expense_df.empty:
+
+
+    left,right = st.columns(2)
+
+
+    category_data = (
+        expense_df
+        .groupby("Category")["Amount"]
+        .sum()
+        .reset_index()
+    )
+
+
+    fig1 = px.pie(
+        category_data,
+        values="Amount",
+        names="Category",
+        title="Expense Breakdown"
+    )
+
+
+    left.plotly_chart(
+        fig1,
+        use_container_width=True
+    )
+
+
+
+    expense_df["Date"] = pd.to_datetime(
+        expense_df["Date"]
+    )
+
+
+    monthly = (
+        expense_df
+        .groupby(
+            expense_df["Date"].dt.to_period("M")
+        )["Amount"]
+        .sum()
+        .reset_index()
+    )
+
+
+    monthly["Date"] = monthly["Date"].astype(str)
+
+
+    fig2 = px.line(
+        monthly,
+        x="Date",
+        y="Amount",
+        markers=True,
+        title="Monthly Spending Trend"
+    )
+
+
+    right.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
+
+
+
+# ---------------- AI SECTION ----------------
+
 
 st.subheader(
-    "🤖 Financial Insights"
+    "🤖 AI Financial Assistant"
 )
 
 
-insights = generate_insights(
+for item in generate_insights(
     total_income,
     total_expense,
     expense_df
-)
+):
+
+    st.info(item)
 
 
-for insight in insights:
 
-    st.info(insight)
-    
+# ---------------- ALERTS ----------------
+
 
 st.subheader(
     "🚨 Spending Alerts"
@@ -245,7 +306,7 @@ anomalies = detect_anomalies(
 if anomalies is None:
 
     st.info(
-        "Add more transactions to detect unusual spending."
+        "Add more transactions for anomaly detection."
     )
 
 
@@ -259,184 +320,18 @@ elif anomalies.empty:
 else:
 
     st.warning(
-        "Unusual transactions found!"
+        "Unusual transactions found"
     )
 
-
     st.dataframe(
-        anomalies[
-            [
-                "Date",
-                "Category",
-                "Amount"
-            ]
-        ],
+        anomalies,
         use_container_width=True
     )
 
-st.subheader(
-    "💡 Smart Recommendations"
-)
 
 
-recommendations = generate_recommendations(
-    total_income,
-    total_expense,
-    expense_df,
-    savings
-)
+# ---------------- FORECAST ----------------
 
-
-for item in recommendations:
-
-    st.info(item)
-    
-
-st.subheader(
-    "🎯 Savings Goals"
-)
-
-
-db = SessionLocal()
-
-
-goals = db.query(Goal).filter(
-    Goal.user_id == user_id
-).all()
-
-
-db.close()
-
-
-
-if not goals:
-
-    st.info(
-        "Create a savings goal to track progress."
-    )
-
-
-else:
-
-    for goal in goals:
-
-
-        progress = (
-            goal.saved_amount /
-            goal.target_amount
-        )
-
-
-        progress = min(
-            progress,
-            1.0
-        )
-
-
-        st.write(
-            goal.goal_name
-        )
-
-
-        st.progress(
-            progress
-        )
-
-
-        st.caption(
-            f"₹{goal.saved_amount:,.0f} "
-            f"saved out of "
-            f"₹{goal.target_amount:,.0f}"
-        )
-    
-# Expense chart
-
-if not expense_df.empty:
-
-    st.subheader(
-        "Spending by Category"
-    )
-
-    category_data = (
-        expense_df
-        .groupby("Category")
-        ["Amount"]
-        .sum()
-        .reset_index()
-    )
-
-
-    fig = px.pie(
-        category_data,
-        values="Amount",
-        names="Category",
-        title="Expense Distribution"
-    )
-
-
-    st.plotly_chart(fig)
-
-if not expense_df.empty:
-
-    st.subheader(
-        "Monthly Expense Trend"
-    )
-
-
-    expense_df["Date"] = pd.to_datetime(
-        expense_df["Date"]
-    )
-
-
-    monthly_expense = (
-        expense_df
-        .groupby(
-            expense_df["Date"].dt.to_period("M")
-        )
-        ["Amount"]
-        .sum()
-        .reset_index()
-    )
-
-
-    monthly_expense["Date"] = (
-        monthly_expense["Date"]
-        .astype(str)
-    )
-
-
-    fig2 = px.line(
-        monthly_expense,
-        x="Date",
-        y="Amount",
-        markers=True,
-        title="Monthly Spending"
-    )
-
-
-    st.plotly_chart(fig2)
-    
-    
-st.subheader(
-    "Budget Usage"
-)
-
-
-if total_income > 0:
-
-    usage = (
-        total_expense / total_income
-    )
-
-
-    st.progress(
-        min(usage,1.0)
-    )
-
-
-    st.write(
-        f"You have used {usage*100:.1f}% of your income."
-    )
 
 st.subheader(
     "🔮 Expense Forecast"
@@ -460,16 +355,56 @@ if prediction:
         f"Expected next month spending: ₹{prediction:,.0f}"
     )
 
-else:
 
-    st.info(
-        "Add more monthly data to generate forecast."
-    )
-    
-# Expense table
+
+# ---------------- GOALS ----------------
+
 
 st.subheader(
-    "Recent Transactions"
+    "🎯 Savings Goals"
+)
+
+
+
+if not goals:
+
+    st.info(
+        "Create a goal to track savings."
+    )
+
+
+else:
+
+    for goal in goals:
+
+        progress = min(
+            goal.saved_amount /
+            goal.target_amount,
+            1
+        )
+
+
+        st.write(
+            goal.goal_name
+        )
+
+
+        st.progress(
+            progress
+        )
+
+
+        st.caption(
+            f"₹{goal.saved_amount:,.0f} / ₹{goal.target_amount:,.0f}"
+        )
+
+
+
+# ---------------- TRANSACTIONS ----------------
+
+
+st.subheader(
+    "🧾 Recent Transactions"
 )
 
 
@@ -482,21 +417,51 @@ if not expense_df.empty:
         ),
         use_container_width=True
     )
+
+
+
+# ---------------- EXPORT ----------------
+
+
 st.subheader(
-    "⬇️ Export Data"
+    "⬇️ Export"
 )
 
 
-csv_file = export_transactions(
+csv = export_transactions(
     expense_df
 )
 
 
-if csv_file:
+if csv:
 
     st.download_button(
-        label="Download Expenses CSV",
-        data=csv_file,
-        file_name="my_expenses.csv",
-        mime="text/csv"
+        "Download CSV",
+        csv,
+        file_name="expenses.csv"
     )
+
+
+
+if st.button("Generate PDF Report"):
+
+
+    create_report(
+        "finance_report.pdf",
+        total_income,
+        total_expense,
+        savings,
+        score
+    )
+
+
+    with open(
+        "finance_report.pdf",
+        "rb"
+    ) as f:
+
+        st.download_button(
+            "Download PDF",
+            f,
+            file_name="finance_report.pdf"
+        )
