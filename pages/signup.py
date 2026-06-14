@@ -1,5 +1,6 @@
 import streamlit as st
-from auth.authentication import create_user
+from auth.authentication import create_user, login_user
+from utils.session import login_session
 
 
 def signup():
@@ -27,8 +28,20 @@ def signup():
 
 
         if success:
+
+            user = login_user(
+            email,
+            password
+            )
+
+            login_session(user)
+
             st.success(
-                "Account created!"
+            "Account created!"
+            )
+
+            st.switch_page(
+            "pages/dashboard.py"
             )
         else:
             st.error(

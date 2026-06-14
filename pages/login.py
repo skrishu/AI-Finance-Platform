@@ -33,7 +33,7 @@ def login():
             )
 
             st.switch_page(
-                "app.py"
+                "pages/dashboard.py"
             )
 
 

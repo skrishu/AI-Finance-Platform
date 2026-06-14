@@ -3,6 +3,18 @@ from database.db import SessionLocal
 from database.models import Expense, Income
 from datetime import date
 
+from models.expense_classifier import ExpenseClassifier
+from models.training_data import descriptions, categories
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.switch_page("pages/login.py")
+
+classifier = ExpenseClassifier()
+
+classifier.train(
+    descriptions,
+    categories
+)
+
 
 st.title("Add Transaction")
 
@@ -32,10 +44,30 @@ transaction_date = st.date_input(
 )
 
 
+description = ""
+
+
 if transaction_type == "Expense":
 
+    description = st.text_input(
+        "Description",
+        placeholder="Example: Swiggy order, Uber ride..."
+    )
+
+
+predicted_category = None
+category = None
+
+
+if transaction_type == "Expense":
+
+    predicted_category = classifier.predict(
+        description
+    )
+
+
     category = st.selectbox(
-        "Category",
+        "Confirm Category",
         [
             "Food",
             "Transport",
@@ -44,12 +76,16 @@ if transaction_type == "Expense":
             "Entertainment",
             "Healthcare",
             "Other"
-        ]
-    )
-
-
-    description = st.text_input(
-        "Description"
+        ],
+        index=[
+            "Food",
+            "Transport",
+            "Shopping",
+            "Bills",
+            "Entertainment",
+            "Healthcare",
+            "Other"
+        ].index(predicted_category)
     )
 
 
@@ -68,8 +104,13 @@ if st.button("Save"):
             date=transaction_date
         )
 
+
         db.add(new_expense)
 
+
+        st.success(
+            f"Transaction added! Category saved as {category}"
+        )
 
 
     else:
@@ -80,13 +121,14 @@ if st.button("Save"):
             date=transaction_date
         )
 
+
         db.add(new_income)
+
+
+        st.success(
+            "Income added!"
+        )
 
 
     db.commit()
     db.close()
-
-
-    st.success(
-        "Transaction added!"
-    )

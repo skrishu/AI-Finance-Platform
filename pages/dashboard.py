@@ -16,6 +16,9 @@ from database.models import Goal
 from utils.export import export_transactions
 from utils.report import create_report
 
+if "logged_in" not in st.session_state or not st.session_state.logged_in:
+    st.switch_page("pages/login.py")
+
 st.title("📊 Finance Dashboard")
 
 
